@@ -4,6 +4,7 @@ import com.example.limitorder.cache.LimitOrderResponse;
 import com.example.limitorder.cache.LimitOrderServiceRepo;
 import com.example.limitorder.cache.Order;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +14,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 //@AllArgsConstructor
+@Slf4j
 @Service("limitOrderElasticService")
 public class LimitOrderElasticService implements LimitOrderServiceRepo {
 
@@ -30,13 +32,9 @@ public class LimitOrderElasticService implements LimitOrderServiceRepo {
     @Override
     public LimitOrderResponse getLimitOrder(Long id) {
         Optional<LimitOrder> limitOrder = limitOrderElasticRepository.findById(id);
-        if (limitOrder.isPresent()) {
-            return new LimitOrderResponse(new Order(limitOrder.get().getId(),
-                    limitOrder.get().getLimitPrice(),
-                    limitOrder.get().getVolume()));
-        } else {
-            return new LimitOrderResponse(null);
-        }
+        return limitOrder.map(order -> new LimitOrderResponse(new Order(order.getId(),
+                order.getLimitPrice(),
+                order.getVolume()))).orElseGet(() -> new LimitOrderResponse(null));
     }
 
     @Override
@@ -57,11 +55,19 @@ public class LimitOrderElasticService implements LimitOrderServiceRepo {
 
     @Override
     public void addAllOrders(List<Order> orders) {
-        limitOrderElasticRepository.saveAll(orders.stream()
-                .map(order -> new LimitOrder(order.orderId(),
-                        order.limitPrice(),
-                        order.volume()))
-                .collect(Collectors.toList()));
+        int block = 0;
+        int blockSize = 10000;
+        while (block < orders.size()) {
+            var newBlock = block + blockSize;
+            List<Order> ordersBlock = orders.subList(block, newBlock);
+            limitOrderElasticRepository.saveAll(ordersBlock.stream()
+                    .map(order -> new LimitOrder(order.orderId(),
+                            order.limitPrice(),
+                            order.volume()))
+                    .collect(Collectors.toList()));
+            block = newBlock;
+            log.info("Adding Block: " + block + " of "+ orders.size());
+        }
     }
 
     @Override
