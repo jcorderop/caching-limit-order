@@ -2,7 +2,7 @@
 
 ### Description
 
-This project is used to compare different Caching mechanims using a limit order as example:
+This project is used to compare different Caching mechanism using a limit order as example:
 
 * Java Collections
 * hazelcast
